@@ -155,3 +155,6 @@ Include logs from `journalctl -u openvoiceui -f` (production) or your terminal (
 ## Questions
 
 Open a [GitHub Discussion](../../discussions) or file an issue with the `question` label.
+
+## Dual-agent
+See [DUAL_AGENT_CHECKLIST.md](./DUAL_AGENT_CHECKLIST.md) and [AGENTS.md](./AGENTS.md).
