@@ -298,7 +298,20 @@ class GrokProvider(TTSProvider):
         **kwargs: Any,
     ) -> Iterator[bytes]:
         """Alias for :meth:`stream_speech_sync` (iterator of audio bytes)."""
-        return self.stream_speech_sync(text, voice=voice, **kwargs)
+        # Accept unary-style aliases without TypeError; strip keys WS signature rejects.
+        voice = kwargs.get("voice_id") or kwargs.get("voice") or voice
+        language = kwargs.get("language") or kwargs.get("lang") or "en"
+        allowed = {
+            "codec",
+            "sample_rate",
+            "bit_rate",
+            "optimize_streaming_latency",
+            "speed",
+            "text_normalization",
+            "connect_fn",
+        }
+        clean = {k: v for k, v in kwargs.items() if k in allowed}
+        return self.stream_speech_sync(text, voice=voice, language=language, **clean)
 
     async def stream_speech_async(
         self,
