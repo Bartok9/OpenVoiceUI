@@ -5,7 +5,7 @@ Cloud text-to-speech via xAI (`POST https://api.x.ai/v1/tts`).
 **Single source of truth:** implement and fix TTS logic in `tts_providers/grok_provider.py` (`GrokProvider`).
 `providers/tts/grok_provider.py` (`GrokTTSProvider`) is a thin registry adapter only — keep it in sync by delegating, do not fork HTTP client code.
 
-Higher-level: [VISION.md](../../VISION.md) · [ARCHITECTURE.md](../../ARCHITECTURE.md) · [SECURITY.md](../../SECURITY.md) (env-only keys).
+Higher-level: [VISION.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/VISION.md) · [ARCHITECTURE.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/ARCHITECTURE.md) · [SECURITY.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/SECURITY.md) (env-only keys).
 
 ## Enable (5-line quick start)
 
