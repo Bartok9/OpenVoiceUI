@@ -33,6 +33,7 @@ from .groq_provider import GroqProvider
 from .qwen3_provider import Qwen3Provider
 from .resemble_provider import ResembleProvider
 from .elevenlabs_provider import ElevenLabsProvider
+from .grok_provider import GrokProvider
 
 # Provider registry
 _PROVIDERS = {
@@ -42,6 +43,7 @@ _PROVIDERS = {
     'qwen3': Qwen3Provider,
     'resemble': ResembleProvider,
     'elevenlabs': ElevenLabsProvider,
+    'grok': GrokProvider,
 }
 
 
@@ -135,6 +137,7 @@ __all__ = [
     'Qwen3Provider',
     'ResembleProvider',
     'ElevenLabsProvider',
+    'GrokProvider',
     'get_provider',
     'list_providers',
 ]

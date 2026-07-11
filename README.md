@@ -162,6 +162,7 @@ All configuration is in `.env`. Copy `.env.example` to `.env` and fill in your v
 
 **Optional but recommended:**
 - `GROQ_API_KEY` — enables Groq Orpheus TTS (fast, high quality, free tier)
+- `XAI_API_KEY` — enables Grok / xAI TTS (see [docs/features/grok-tts.md](docs/features/grok-tts.md))
 - `SUNO_API_KEY` — enables AI music generation
 - `CLERK_PUBLISHABLE_KEY` — enables login/auth (for multi-user or public deployments)
 
@@ -193,6 +194,7 @@ See [`.env.example`](.env.example) for all available options with descriptions.
 | Qwen3-TTS (fal.ai) | Voice cloning |
 | Hume EVI | Emotion-aware |
 | ElevenLabs | High quality, many voices |
+| Grok / xAI TTS | Cloud TTS (`XAI_API_KEY`), default voice `eve`, speech tags |
 
 **Speech-to-Text**
 
