@@ -78,7 +78,7 @@ class GrokTTSProvider(TTSProvider):
         self.validate_text(text)
         if not self.api_key:
             raise TTSError("grok", "XAI_API_KEY not set")
-        voice = kwargs.pop("voice", self.default_voice)
+        voice = kwargs.pop("voice_id", None) or kwargs.pop("voice", None) or self.default_voice
         language = kwargs.pop("language", None) or kwargs.pop("lang", None) or self.default_language
         try:
             return self._get_impl().stream_speech_sync(

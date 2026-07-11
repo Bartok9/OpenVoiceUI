@@ -167,6 +167,7 @@ class GrokProvider(TTSProvider):
         text: str,
         voice: str = "eve",
         *,
+        voice_id: Optional[str] = None,
         language: str = "en",
         codec: str = "mp3",
         sample_rate: int = 24000,
@@ -187,6 +188,8 @@ class GrokProvider(TTSProvider):
         if not self.api_key:
             raise RuntimeError("XAI_API_KEY not set")
 
+        # Honor voice_id alias for parity with unary generate_speech.
+        voice = voice_id or voice
         self.validate_text(text)
         # WS path has no hard total length on the session; still guard unary-like
         # single-delta size
@@ -232,11 +235,25 @@ class GrokProvider(TTSProvider):
             optimize_streaming_latency,
         )
 
+        deadline = t0 + STREAM_TIMEOUT
         with connector(uri, headers) as ws:
             ws.send(json.dumps({"type": "text.delta", "delta": text}))
             ws.send(json.dumps({"type": "text.done"}))
             while True:
-                raw = ws.recv()
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"[grok:ws] no audio.done within {STREAM_TIMEOUT}s stream timeout"
+                    )
+                try:
+                    raw = ws.recv(timeout=remaining)
+                except TypeError:
+                    # Older websockets.sync without timeout kwarg support.
+                    raw = ws.recv()
+                except TimeoutError as exc:
+                    raise TimeoutError(
+                        f"[grok:ws] recv timed out after {STREAM_TIMEOUT}s"
+                    ) from exc
                 if isinstance(raw, bytes):
                     # Some stacks may deliver binary audio frames — yield as-is
                     if first:
@@ -288,6 +305,7 @@ class GrokProvider(TTSProvider):
         text: str,
         voice: str = "eve",
         *,
+        voice_id: Optional[str] = None,
         language: str = "en",
         codec: str = "mp3",
         sample_rate: int = 24000,
@@ -300,6 +318,7 @@ class GrokProvider(TTSProvider):
         """Async variant of WebSocket streaming TTS (prefer TTFA path)."""
         if not self.api_key:
             raise RuntimeError("XAI_API_KEY not set")
+        voice = voice_id or voice
         self.validate_text(text)
         if len(text) > MAX_CHARACTERS:
             raise ValueError(f"Text exceeds max {MAX_CHARACTERS} characters per delta")
@@ -330,7 +349,22 @@ class GrokProvider(TTSProvider):
         async with connector(uri, headers) as ws:
             await ws.send(json.dumps({"type": "text.delta", "delta": text}))
             await ws.send(json.dumps({"type": "text.done"}))
-            async for raw in ws:
+            deadline = t0 + STREAM_TIMEOUT
+            aiter = ws.__aiter__()
+            while True:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"[grok:ws] no audio.done within {STREAM_TIMEOUT}s stream timeout"
+                    )
+                try:
+                    raw = await asyncio.wait_for(aiter.__anext__(), timeout=remaining)
+                except StopAsyncIteration:
+                    break
+                except asyncio.TimeoutError as exc:
+                    raise TimeoutError(
+                        f"[grok:ws] recv timed out after {STREAM_TIMEOUT}s"
+                    ) from exc
                 if isinstance(raw, bytes):
                     if first:
                         first = False

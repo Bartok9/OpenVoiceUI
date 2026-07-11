@@ -18,7 +18,7 @@ class _FakeWS:
     def send(self, data):
         self.sent.append(data)
 
-    def recv(self):
+    def recv(self, timeout=None):
         if not self._frames:
             raise RuntimeError("no more frames")
         return self._frames.pop(0)
@@ -85,6 +85,38 @@ class TestGrokTTSStream:
         p.api_key = ""
         with pytest.raises(RuntimeError, match="XAI_API_KEY"):
             list(p.stream_speech_sync("hi", connect_fn=lambda u, h: None))
+
+    def test_stream_honors_voice_id_alias(self):
+        from tts_providers.grok_provider import GrokProvider
+
+        captured = {}
+
+        def connect(url, headers):
+            captured["url"] = url
+
+            @contextmanager
+            def _cm():
+                yield _FakeWS([json.dumps({"type": "audio.done"})])
+
+            return _cm()
+
+        p = GrokProvider()
+        p.api_key = "k"
+        list(p.stream_speech_sync("hi", voice_id="ara", connect_fn=connect))
+        assert "voice=ara" in captured["url"]
+
+    def test_stream_times_out_without_audio_done(self):
+        from tts_providers import grok_provider as gp
+
+        # No terminal frame; only non-terminal metadata, then blocks.
+        frames = [json.dumps({"type": "session.created"})] * 3
+
+        with _fake_connect(frames) as (connect, ws), \
+                patch.object(gp, "STREAM_TIMEOUT", 0.0):
+            p = gp.GrokProvider()
+            p.api_key = "k"
+            with pytest.raises(TimeoutError, match="stream timeout"):
+                list(p.stream_speech_sync("hi", connect_fn=connect))
 
     def test_stream_ws_query_ttfa_default(self):
         from tts_providers.grok_provider import GrokProvider, TTS_WS_URL
