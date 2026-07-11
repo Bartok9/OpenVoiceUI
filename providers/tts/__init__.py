@@ -16,5 +16,6 @@ from providers.tts.base import TTSProvider, TTSVoice, TTSError, TTSVoiceNotFound
 # Import concrete providers so their registry.register() calls fire
 from providers.tts import supertonic_provider  # noqa: F401
 from providers.tts import groq_provider  # noqa: F401
+from providers.tts import grok_provider  # noqa: F401
 
 __all__ = ["TTSProvider", "TTSVoice", "TTSError", "TTSVoiceNotFoundError"]

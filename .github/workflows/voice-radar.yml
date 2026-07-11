@@ -1,0 +1,40 @@
+# Weekly voice tech radar snapshot (Bartok9/OpenVoiceUI).
+# Writes docs/radar/YYYY-MM-DD.md and opens no network calls by default.
+name: voice-radar
+
+on:
+  schedule:
+    # Mondays 14:00 UTC
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  radar:
+    # Only run on the Bartok9 fork; skip forks / upstream clones via repository_owner.
+    if: github.repository_owner == 'Bartok9'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate radar
+        run: python3 scripts/voice_tech_radar.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/radar || true
+          if git diff --cached --quiet; then
+            echo "No radar changes"
+          else
+            git commit -m "docs(radar): weekly voice tech radar snapshot"
+            git push
+          fi
