@@ -360,7 +360,9 @@ class GrokProvider(TTSProvider):
                 try:
                     raw = await asyncio.wait_for(aiter.__anext__(), timeout=remaining)
                 except StopAsyncIteration:
-                    break
+                    raise RuntimeError(
+                        "[grok:ws] WebSocket closed before audio.done"
+                    )
                 except asyncio.TimeoutError as exc:
                     raise TimeoutError(
                         f"[grok:ws] recv timed out after {STREAM_TIMEOUT}s"
