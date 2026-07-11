@@ -1,0 +1,28 @@
+# llms.txt — OpenVoiceUI
+# Machine-oriented index for AI agents (OpenClaw + Hermes). Prefer these files first.
+
+## Dual-agent entry
+- SOUL.md: OpenClaw soul — operator persona + hard rules (no personal PII)
+- AGENTS.md: Dual-agent contract — commands, skills, boundaries
+- llms.txt: This file (index)
+- DUAL_AGENT_CHECKLIST.md: Readiness scores for this repo
+
+## Product docs
+- README.md: Install (Docker / npx / Pinokio) + features
+- VISION.md: Bartok9 track goals vs upstream
+- ARCHITECTURE.md: System design
+- docs/getting-started/HERMES.md: Hermes runtime notes
+- docs/features/grok-tts.md: Grok/xAI TTS
+- SECURITY.md: Key hygiene
+- CURSOR-UPGRADE-ROUND-2.md / CURSOR-UPGRADE-CHECKLIST.md: Backlog
+
+## Code entry (high traffic)
+- tts_providers/grok_provider.py
+- providers/tts/grok_provider.py
+- tests/test_grok_tts_provider.py
+- scripts/voice_tech_radar.py
+- scripts/check-runtime.sh
+
+## Upstream
+- https://github.com/MCERQUA/OpenVoiceUI (parent)
+- https://github.com/Bartok9/OpenVoiceUI (this fork)
