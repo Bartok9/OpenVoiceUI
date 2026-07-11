@@ -301,3 +301,19 @@ We welcome contributions — especially plugins. Build a face pack, a canvas pag
   <a href="https://www.npmjs.com/package/openvoiceui">npm</a> &nbsp;&middot;&nbsp;
   <a href="https://github.com/MCERQUA/openvoiceui-plugins">Plugins</a>
 </p>
+
+
+---
+
+## Bartok9 track (agents & maintainers)
+
+This public fork tracks upstream [MCERQUA/OpenVoiceUI](https://github.com/MCERQUA/OpenVoiceUI) and adds Team of Light / dual-runtime upgrades.
+
+| Doc | Why |
+|-----|-----|
+| [VISION.md](./VISION.md) | Where we are taking the fork |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Layers, providers, runtimes |
+| [AGENTS.md](./AGENTS.md) | How agents should work in-tree |
+| [CURSOR-UPGRADE-CHECKLIST.md](./CURSOR-UPGRADE-CHECKLIST.md) | Implementation codebase plan (Grok TTS, Hermes, radar) |
+| [Hermes pairing (draft)](./docs/getting-started/HERMES.md) | Dual runtime intent |
+
