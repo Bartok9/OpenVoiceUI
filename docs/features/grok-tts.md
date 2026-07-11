@@ -46,7 +46,36 @@ audio_mp3 = provider.generate_speech(
 | `voice_id` | no | Default **`eve`** |
 | `language` | yes in API; we default **`en`** | BCP-47 or `auto` |
 
-Optional: `speed` (0.7–1.5), `output_format`, `text_normalization`.
+Optional: `speed` (0.7–1.5), `output_format`, `text_normalization`, `optimize_streaming_latency` (0–2, TTFA).
+
+## Streaming TTS (WebSocket) — TTFA path
+
+Documented bidirectional endpoint: **`wss://api.x.ai/v1/tts`** (query: `language`, `voice`, `codec`, `sample_rate`, `optimize_streaming_latency`, …).
+
+```python
+from tts_providers import get_provider
+
+provider = get_provider("grok")
+# Prefer optimize_streaming_latency=1 or 2 for lower time-to-first-audio
+for chunk in provider.stream_speech(
+    "Hello with low first-byte latency.",
+    voice="eve",
+    language="en",
+    optimize_streaming_latency=1,
+):
+    # play or forward chunk (MP3 bytes per delta)
+    ...
+```
+
+Also available as `GrokProvider.stream_speech_sync` / `stream_speech_async`.
+Unary `POST /v1/tts` remains the default for simple full-file generation.
+
+Live smoke (writes under `/tmp` only):
+
+```bash
+export XAI_API_KEY=...
+python3 scripts/smoke_grok_tts.py
+```
 
 ## Voices (agents)
 

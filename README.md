@@ -162,7 +162,7 @@ All configuration is in `.env`. Copy `.env.example` to `.env` and fill in your v
 
 **Optional but recommended:**
 - `GROQ_API_KEY` — enables Groq Orpheus TTS (fast, high quality, free tier)
-- `XAI_API_KEY` — enables Grok / xAI TTS (see [docs/features/grok-tts.md](docs/features/grok-tts.md))
+- `XAI_API_KEY` — **Grok works if you have XAI_API_KEY** (TTS + STT). Docs: [grok-tts](docs/features/grok-tts.md), [grok-stt](docs/features/grok-stt.md). Live smoke (writes `/tmp` only): `python3 scripts/smoke_grok_tts.py`. Streaming TTS / TTFA: `GrokProvider.stream_speech` → `wss://api.x.ai/v1/tts`. Experimental realtime bridge is **off by default** (`OPENVOICEUI_GROK_REALTIME=1` to enable; server-side only, never browser raw key).
 - `SUNO_API_KEY` — enables AI music generation
 - `CLERK_PUBLISHABLE_KEY` — enables login/auth (for multi-user or public deployments)
 
@@ -194,7 +194,7 @@ See [`.env.example`](.env.example) for all available options with descriptions.
 | Qwen3-TTS (fal.ai) | Voice cloning |
 | Hume EVI | Emotion-aware |
 | ElevenLabs | High quality, many voices |
-| Grok / xAI TTS | Cloud TTS (`XAI_API_KEY`), default voice `eve`, speech tags |
+| Grok / xAI TTS + STT | Cloud TTS/STT (`XAI_API_KEY`), default voice `eve`, speech tags, WS streaming TTFA |
 
 **Speech-to-Text**
 

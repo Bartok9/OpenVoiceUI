@@ -10,10 +10,14 @@ Docs: https://docs.x.ai/developers/model-capabilities/audio/text-to-speech
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional, Tuple
+from urllib.parse import urlencode
 
 import httpx
 
@@ -23,9 +27,11 @@ logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.x.ai/v1"
 TTS_URL = f"{API_BASE}/tts"
+TTS_WS_URL = "wss://api.x.ai/v1/tts"
 VOICES_URL = f"{API_BASE}/tts/voices"
 
 GENERATE_TIMEOUT = 30.0
+STREAM_TIMEOUT = 60.0
 LIST_TIMEOUT = 15.0
 HEALTH_TIMEOUT = 10.0
 
@@ -131,6 +137,278 @@ class GrokProvider(TTSProvider):
         logger.info("[Grok/xAI] Generated %s bytes in %sms", len(audio_bytes), elapsed)
         return audio_bytes
 
+    def _stream_ws_query(
+        self,
+        *,
+        voice: str = "eve",
+        language: str = "en",
+        codec: str = "mp3",
+        sample_rate: int = 24000,
+        bit_rate: int = 128000,
+        speed: Optional[float] = None,
+        optimize_streaming_latency: int = 1,
+        text_normalization: bool = False,
+    ) -> str:
+        params: Dict[str, Any] = {
+            "language": language,
+            "voice": voice or "eve",
+            "codec": codec,
+            "sample_rate": int(sample_rate),
+            "bit_rate": int(bit_rate),
+            "optimize_streaming_latency": int(optimize_streaming_latency),
+            "text_normalization": "true" if text_normalization else "false",
+        }
+        if speed is not None:
+            params["speed"] = float(speed)
+        return f"{TTS_WS_URL}?{urlencode(params)}"
+
+    def stream_speech_sync(
+        self,
+        text: str,
+        voice: str = "eve",
+        *,
+        voice_id: Optional[str] = None,
+        language: str = "en",
+        codec: str = "mp3",
+        sample_rate: int = 24000,
+        bit_rate: int = 128000,
+        optimize_streaming_latency: int = 1,
+        speed: Optional[float] = None,
+        text_normalization: bool = False,
+        connect_fn=None,
+    ) -> Iterator[bytes]:
+        """
+        Stream TTS via bidirectional WebSocket ``wss://api.x.ai/v1/tts`` (TTFA path).
+
+        Yields raw audio chunks decoded from ``audio.delta`` events.
+        ``connect_fn`` is injectable for unit tests (mock sockets).
+
+        Official docs: Streaming TTS (WebSocket) on xAI TTS docs.
+        """
+        if not self.api_key:
+            raise RuntimeError("XAI_API_KEY not set")
+
+        # Honor voice_id alias for parity with unary generate_speech.
+        voice = voice_id or voice
+        self.validate_text(text)
+        # WS path has no hard total length on the session; still guard unary-like
+        # single-delta size
+        if len(text) > MAX_CHARACTERS:
+            # split into MAX chunks at sentence-ish boundaries would be nicer;
+            # for now, one delta max per official client message cap.
+            raise ValueError(
+                f"stream_speech_sync text delta exceeds max {MAX_CHARACTERS} characters; "
+                "split caller-side or use multi-delta helpers"
+            )
+
+        uri = self._stream_ws_query(
+            voice=voice or "eve",
+            language=language or "en",
+            codec=codec,
+            sample_rate=sample_rate,
+            bit_rate=bit_rate,
+            speed=speed,
+            optimize_streaming_latency=optimize_streaming_latency,
+            text_normalization=text_normalization,
+        )
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+
+        def _default_connect(url: str, hdrs: Dict[str, str]):
+            try:
+                import websockets
+                from websockets.sync.client import connect as ws_connect
+            except ImportError as exc:  # pragma: no cover
+                raise RuntimeError(
+                    "websockets package required for Grok streaming TTS"
+                ) from exc
+            return ws_connect(url, additional_headers=hdrs, open_timeout=15, close_timeout=5)
+
+        connector = connect_fn or _default_connect
+
+        t0 = time.time()
+        first = True
+        logger.info(
+            "[Grok/xAI] TTS WS stream: '%s' voice=%s lang=%s osl=%s",
+            text[:60],
+            voice,
+            language,
+            optimize_streaming_latency,
+        )
+
+        deadline = t0 + STREAM_TIMEOUT
+        with connector(uri, headers) as ws:
+            ws.send(json.dumps({"type": "text.delta", "delta": text}))
+            ws.send(json.dumps({"type": "text.done"}))
+            while True:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"[grok:ws] no audio.done within {STREAM_TIMEOUT}s stream timeout"
+                    )
+                try:
+                    raw = ws.recv(timeout=remaining)
+                except TypeError:
+                    # Older websockets.sync without timeout kwarg support.
+                    raw = ws.recv()
+                except TimeoutError as exc:
+                    raise TimeoutError(
+                        f"[grok:ws] recv timed out after {STREAM_TIMEOUT}s"
+                    ) from exc
+                if isinstance(raw, bytes):
+                    # Some stacks may deliver binary audio frames — yield as-is
+                    if first:
+                        logger.info(
+                            "[Grok/xAI] TTFA (binary) %sms",
+                            int((time.time() - t0) * 1000),
+                        )
+                        first = False
+                    yield raw
+                    continue
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.warning("[Grok/xAI] non-JSON WS frame skipped")
+                    continue
+                et = event.get("type") or ""
+                if et in ("audio.delta", "response.output_audio.delta"):
+                    b64 = event.get("delta") or event.get("audio") or ""
+                    if not b64:
+                        continue
+                    chunk = base64.b64decode(b64)
+                    if first:
+                        logger.info(
+                            "[Grok/xAI] TTFA %sms (%s bytes first chunk)",
+                            int((time.time() - t0) * 1000),
+                            len(chunk),
+                        )
+                        first = False
+                    yield chunk
+                elif et in ("audio.done", "response.output_audio.done"):
+                    break
+                elif et == "error":
+                    raise RuntimeError(
+                        f"[grok:ws] {event.get('message') or event.get('error') or event}"
+                    )
+                # ignore other session metadata
+
+    def stream_speech(
+        self,
+        text: str,
+        voice: str = "eve",
+        **kwargs: Any,
+    ) -> Iterator[bytes]:
+        """Alias for :meth:`stream_speech_sync` (iterator of audio bytes)."""
+        # Accept unary-style aliases without TypeError; strip keys WS signature rejects.
+        voice = kwargs.get("voice_id") or kwargs.get("voice") or voice
+        language = kwargs.get("language") or kwargs.get("lang") or "en"
+        allowed = {
+            "codec",
+            "sample_rate",
+            "bit_rate",
+            "optimize_streaming_latency",
+            "speed",
+            "text_normalization",
+            "connect_fn",
+        }
+        clean = {k: v for k, v in kwargs.items() if k in allowed}
+        return self.stream_speech_sync(text, voice=voice, language=language, **clean)
+
+    async def stream_speech_async(
+        self,
+        text: str,
+        voice: str = "eve",
+        *,
+        voice_id: Optional[str] = None,
+        language: str = "en",
+        codec: str = "mp3",
+        sample_rate: int = 24000,
+        bit_rate: int = 128000,
+        optimize_streaming_latency: int = 1,
+        speed: Optional[float] = None,
+        text_normalization: bool = False,
+        connect_fn=None,
+    ) -> AsyncIterator[bytes]:
+        """Async variant of WebSocket streaming TTS (prefer TTFA path)."""
+        if not self.api_key:
+            raise RuntimeError("XAI_API_KEY not set")
+        voice = voice_id or voice
+        self.validate_text(text)
+        if len(text) > MAX_CHARACTERS:
+            raise ValueError(f"Text exceeds max {MAX_CHARACTERS} characters per delta")
+
+        uri = self._stream_ws_query(
+            voice=voice or "eve",
+            language=language or "en",
+            codec=codec,
+            sample_rate=sample_rate,
+            bit_rate=bit_rate,
+            speed=speed,
+            optimize_streaming_latency=optimize_streaming_latency,
+            text_normalization=text_normalization,
+        )
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+
+        async def _default_connect(url: str, hdrs: Dict[str, str]):
+            import websockets
+
+            return websockets.connect(
+                url, additional_headers=hdrs, open_timeout=15, close_timeout=5
+            )
+
+        connector = connect_fn or _default_connect
+        t0 = time.time()
+        first = True
+
+        async with connector(uri, headers) as ws:
+            await ws.send(json.dumps({"type": "text.delta", "delta": text}))
+            await ws.send(json.dumps({"type": "text.done"}))
+            deadline = t0 + STREAM_TIMEOUT
+            aiter = ws.__aiter__()
+            while True:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"[grok:ws] no audio.done within {STREAM_TIMEOUT}s stream timeout"
+                    )
+                try:
+                    raw = await asyncio.wait_for(aiter.__anext__(), timeout=remaining)
+                except StopAsyncIteration:
+                    raise RuntimeError(
+                        "[grok:ws] WebSocket closed before audio.done"
+                    )
+                except asyncio.TimeoutError as exc:
+                    raise TimeoutError(
+                        f"[grok:ws] recv timed out after {STREAM_TIMEOUT}s"
+                    ) from exc
+                if isinstance(raw, bytes):
+                    if first:
+                        first = False
+                    yield raw
+                    continue
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                et = event.get("type") or ""
+                if et in ("audio.delta", "response.output_audio.delta"):
+                    b64 = event.get("delta") or event.get("audio") or ""
+                    if not b64:
+                        continue
+                    chunk = base64.b64decode(b64)
+                    if first:
+                        logger.info(
+                            "[Grok/xAI] async TTFA %sms",
+                            int((time.time() - t0) * 1000),
+                        )
+                        first = False
+                    yield chunk
+                elif et in ("audio.done", "response.output_audio.done"):
+                    break
+                elif et == "error":
+                    raise RuntimeError(
+                        f"[grok:ws] {event.get('message') or event.get('error') or event}"
+                    )
+
     def list_voices(self) -> List[str]:
         """
         Return voice IDs: live GET /v1/tts/voices when keyed, else documented roster.
@@ -221,6 +499,8 @@ class GrokProvider(TTSProvider):
                 "mp3-output",
                 "custom-voices-api",
                 "agent-friendly-defaults",
+                "streaming-websocket",
+                "ttfa-optimize-streaming-latency",
             ],
             "requires_api_key": True,
             "languages": [
@@ -267,4 +547,5 @@ __all__ = [
     "DOCUMENTED_VOICES",
     "AGENT_VOICE_PREFERENCE_NOTES",
     "TTS_URL",
+    "TTS_WS_URL",
 ]
