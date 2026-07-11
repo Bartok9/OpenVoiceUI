@@ -22,9 +22,9 @@
 - [x] Add `ARCHITECTURE.md`  
 - [x] Add `AGENTS.md`  
 - [x] Add this checklist  
-- [ ] Link them from README (short "Bartok track / for agents" section)  
-- [ ] `docs/getting-started/HERMES.md` dual-runtime sketch (env table OpenClaw vs Hermes)  
-- [ ] Keep upstream attribution clear in README  
+- [x] Link them from README (short "Bartok track / for agents" section)  
+- [x] `docs/getting-started/HERMES.md` dual-runtime sketch (env table OpenClaw vs Hermes)  
+- [x] Keep upstream attribution clear in README  
 
 ---
 
