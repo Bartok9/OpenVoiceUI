@@ -4,7 +4,7 @@ Cloud speech-to-text via xAI (`POST https://api.x.ai/v1/stt`).
 
 **Implementation:** `providers/stt/grok_provider.py` (`GrokSTTProvider`, registry id **`grok`**).
 
-Higher-level: [VISION.md](../../VISION.md) · [ARCHITECTURE.md](../../ARCHITECTURE.md) · [SECURITY.md](../../SECURITY.md) (env-only keys).
+Higher-level: [VISION.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/VISION.md) · [ARCHITECTURE.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/ARCHITECTURE.md) · [SECURITY.md](https://github.com/MCERQUA/OpenVoiceUI/blob/main/SECURITY.md) (env-only keys).
 
 ## Enable
 
