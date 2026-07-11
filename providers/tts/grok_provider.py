@@ -23,7 +23,9 @@ class GrokTTSProvider(TTSProvider):
     def __init__(self, config: Dict[str, Any] = None) -> None:
         super().__init__(config)
         self.api_key = self._resolve_api_key()
-        self.default_voice = self._config.get("voice", "eve")
+        self.default_voice = self._config.get(
+            "default_voice", self._config.get("voice", "eve")
+        )
         self.default_language = self._config.get("language", "en")
         self._impl = None
 
@@ -52,13 +54,19 @@ class GrokTTSProvider(TTSProvider):
             raise TTSError("grok", "XAI_API_KEY not set")
 
         voice = kwargs.get("voice", self.default_voice)
-        language = kwargs.get("language", self.default_language)
+        language = (
+            kwargs.get("language") or kwargs.get("lang") or self.default_language
+        )
         try:
             return self._get_impl().generate_speech(
                 text,
                 voice=voice,
                 language=language,
-                **{k: v for k, v in kwargs.items() if k not in ("voice", "language")},
+                **{
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ("voice", "language", "lang")
+                },
             )
         except TTSError:
             raise

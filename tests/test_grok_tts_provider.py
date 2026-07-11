@@ -163,6 +163,32 @@ class TestGrokTTSProviderRegistry:
         assert out == b"wav-or-mp3"
         impl.generate_speech.assert_called()
 
+    def test_adapter_reads_default_voice_from_config(self):
+        from providers.tts.grok_provider import GrokTTSProvider
+
+        prov = GrokTTSProvider({"api_key": "k", "default_voice": "ara"})
+        assert prov.default_voice == "ara"
+
+        impl = MagicMock()
+        impl.generate_speech.return_value = b"audio"
+        with patch.object(GrokTTSProvider, "_get_impl", return_value=impl):
+            prov.generate_speech("hi")
+        impl.generate_speech.assert_called_once_with(
+            "hi", voice="ara", language="en"
+        )
+
+    def test_adapter_honors_lang_alias(self):
+        from providers.tts.grok_provider import GrokTTSProvider
+
+        prov = GrokTTSProvider({"api_key": "k"})
+        impl = MagicMock()
+        impl.generate_speech.return_value = b"audio"
+        with patch.object(GrokTTSProvider, "_get_impl", return_value=impl):
+            prov.generate_speech("hi", lang="fr")
+        impl.generate_speech.assert_called_once_with(
+            "hi", voice="eve", language="fr"
+        )
+
     def test_adapter_raises_tts_error_without_key(self):
         from providers.tts.grok_provider import GrokTTSProvider
         from providers.tts.base import TTSError
