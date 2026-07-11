@@ -73,6 +73,22 @@ class GrokTTSProvider(TTSProvider):
         except Exception as exc:
             raise TTSError("grok", f"Generation failed: {exc}") from exc
 
+    def stream_speech(self, text: str, **kwargs):
+        """WebSocket streaming TTS (TTFA). Delegates to canonical GrokProvider."""
+        self.validate_text(text)
+        if not self.api_key:
+            raise TTSError("grok", "XAI_API_KEY not set")
+        voice = kwargs.pop("voice", self.default_voice)
+        language = kwargs.pop("language", None) or kwargs.pop("lang", None) or self.default_language
+        try:
+            return self._get_impl().stream_speech_sync(
+                text, voice=voice, language=language, **kwargs
+            )
+        except TTSError:
+            raise
+        except Exception as exc:
+            raise TTSError("grok", f"Stream failed: {exc}") from exc
+
     def list_voices(self) -> List[str]:
         try:
             return self._get_impl().list_voices()
